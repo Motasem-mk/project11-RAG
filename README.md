@@ -40,57 +40,61 @@ flowchart TD
   A1 -->|One-shot| A2[run_pipeline.py]
   A1 -->|Build + Chat| A3[build_index.py] --> A4[chat_demo.py]
 
+  %% ========== INGEST ==========
   subgraph INGEST
     direction LR
-    B[fetch_openagenda.py\n(city-only, safe pagination)] --> C[OpenDataSoft API\n"evenements-publics-openagenda"]
-    C --> D{≤ 12 months?\nend_utc ≥ now-365d OR start_utc ≥ now-365d}
-    D -->|yes| E[Clean HTML, normalize URLs,\nselect schema: title/text/city/venue/dates/tags/link]
+    B[fetch_openagenda.py<br/>city-only, safe pagination] --> C[OpenDataSoft API<br/>evenements-publics-openagenda]
+    C --> D{≤ 12 months?<br/>end_utc ≥ now-365d OR start_utc ≥ now-365d}
+    D -->|yes| E[Clean HTML & URLs<br/>schema: title/text/city/venue/dates/tags/link]
     D -->|no| X[Drop record]
     E --> F[(DataFrame rows)]
   end
 
+  %% ========== INDEX ==========
   subgraph INDEX
     direction LR
-    F --> G[Build LangChain Documents\n+ embed normalized date tokens:\nYearStart/MonthStart/YearEnd/MonthEnd]
-    G --> H[Split (RecursiveCharacterTextSplitter)]
-    H --> I[Embeddings: Mistral "mistral-embed"]
+    F --> G[Build Documents<br/>embed date tokens: YearStart/MonthStart/YearEnd/MonthEnd]
+    G --> H[Split: RecursiveCharacterTextSplitter]
+    H --> I[Embeddings: Mistral (mistral-embed)]
     I --> J[FAISS index]
     J --> K{Persist?}
-    K -->|--index-out| K1[Save to disk\n(data/index/faiss_*)]
+    K -->|--index-out| K1[Save to disk<br/>data/index/faiss_*]
     K -->|--ephemeral| K2[Keep in memory only]
   end
 
+  %% ========== CHAT ==========
   subgraph CHAT
     direction TB
-    L[chat_demo.py or run_pipeline.py loop] --> L1[Detect language (safe)\n+ fallback]
+    L[chat loop] --> L1[Detect language (safe) + fallback]
     L --> M{Month/Year mentioned?}
-    M -->|yes| M1[Augment query with date tokens\n(YearStart/MonthStart/YearEnd/MonthEnd)]
+    M -->|yes| M1[Augment query with date tokens]
     M -->|no| M2[Use raw query]
     M1 --> N[Retriever: similarity_search (k)]
     M2 --> N
-    N --> O{Ask for "upcoming"/"à venir"?}
-    O -->|yes| O1[Filter docs by\nParis tomorrow 00:00 (UTC)]
+    N --> O{Ask for upcoming / à venir?}
+    O -->|yes| O1[Filter by Paris tomorrow 00:00 UTC]
     O -->|no| O2[Use docs as-is]
-    O1 --> P[Build CONTEXT + collect allowed URLs from metadata]
+    O1 --> P[Build CONTEXT + collect allowed URLs]
     O2 --> P
-    P --> Q[LLM: Mistral chat\n(system forbids made-up links)]
-    Q --> R[Sanitize links:\nstrip any URL not in allowed set]
-    R --> S([Answer to user])
+    P --> Q[LLM: Mistral chat<br/>system forbids made-up links]
+    Q --> R[Sanitize links<br/>keep only allowed URLs]
+    R --> S([Answer])
   end
 
-  subgraph TESTS (required)
-    direction LR
-    K1 --> T[tests/test_index_data_constraints.py\nLoad index.pkl → ensure all docs are:\n• ≤ 12 months old\n• same (selected) city]
+  %% ========== TESTS (required) ==========
+  subgraph TESTS_required
+    K1 --> T[test_index_data_constraints.py<br/>verify ≤12 months & single city]
   end
 
-  subgraph CLEANUP (optional)
-    direction LR
+  %% ========== CLEANUP (optional) ==========
+  subgraph CLEANUP_optional
     K1 --> U{--cleanup-index-out?}
-    U -->|yes (and marker exists)| U1[Delete saved index dir]
-    U -->|no| U2[Keep index on disk]
+    U -->|yes + marker| U1[Delete index folder]
+    U -->|no| U2[Keep on disk]
   end
 
   classDef cli fill:#222,color:#fff,stroke:#555,stroke-width:1;
+
 ```
 
 ---
@@ -287,3 +291,4 @@ rm -f .env
 ## License / usage
 
 This POC is intended for educational/demo purposes. Respect OpenDataSoft/OpenAgenda terms when querying and redistributing data.
+
