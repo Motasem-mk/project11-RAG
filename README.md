@@ -37,59 +37,54 @@ Retrieval-Augmented Generation (RAG) POC that recommends and answers questions a
 ```mermaid
 flowchart TD
   A([CLI]):::cli --> A1{Mode?}
-  A1 -->|One-shot| A2[run_pipeline.py]
-  A1 -->|Build + Chat| A3[build_index.py] --> A4[chat_demo.py]
+  A1 -->|One shot| A2[run_pipeline.py]
+  A1 -->|Build and Chat| A3[build_index.py] --> A4[chat_demo.py]
 
-  %% ========== INGEST ==========
   subgraph INGEST
     direction LR
-    B[fetch_openagenda.py<br/>city-only, safe pagination] --> C[OpenDataSoft API<br/>evenements-publics-openagenda]
-    C --> D{≤ 12 months?<br/>end_utc ≥ now-365d OR start_utc ≥ now-365d}
-    D -->|yes| E[Clean HTML & URLs<br/>schema: title/text/city/venue/dates/tags/link]
+    B[fetch_openagenda.py city only safe pagination] --> C[OpenDataSoft API evenements publics openagenda]
+    C --> D{last 12 months? end_utc >= now minus 365d OR start_utc >= now minus 365d}
+    D -->|yes| E[Clean HTML and URLs choose schema title text city venue dates tags link]
     D -->|no| X[Drop record]
     E --> F[(DataFrame rows)]
   end
 
-  %% ========== INDEX ==========
   subgraph INDEX
     direction LR
-    F --> G[Build Documents<br/>embed date tokens: YearStart/MonthStart/YearEnd/MonthEnd]
-    G --> H[Split: RecursiveCharacterTextSplitter]
-    H --> I[Embeddings: Mistral (mistral-embed)]
+    F --> G[Build Documents embed date tokens YearStart MonthStart YearEnd MonthEnd]
+    G --> H[Split RecursiveCharacterTextSplitter]
+    H --> I[Embeddings Mistral mistral embed]
     I --> J[FAISS index]
     J --> K{Persist?}
-    K -->|--index-out| K1[Save to disk<br/>data/index/faiss_*]
+    K -->|--index out| K1[Save to disk data index faiss]
     K -->|--ephemeral| K2[Keep in memory only]
   end
 
-  %% ========== CHAT ==========
   subgraph CHAT
     direction TB
-    L[chat loop] --> L1[Detect language (safe) + fallback]
-    L --> M{Month/Year mentioned?}
+    L[chat loop] --> L1[Detect language safe with fallback]
+    L --> M{Month or Year mentioned?}
     M -->|yes| M1[Augment query with date tokens]
     M -->|no| M2[Use raw query]
-    M1 --> N[Retriever: similarity_search (k)]
+    M1 --> N[Retriever similarity search k]
     M2 --> N
-    N --> O{Ask for upcoming / à venir?}
-    O -->|yes| O1[Filter by Paris tomorrow 00:00 UTC]
-    O -->|no| O2[Use docs as-is]
-    O1 --> P[Build CONTEXT + collect allowed URLs]
+    N --> O{Upcoming asked?}
+    O -->|yes| O1[Filter by Paris tomorrow 00 00 UTC]
+    O -->|no| O2[Use docs as is]
+    O1 --> P[Build CONTEXT and collect allowed URLs]
     O2 --> P
-    P --> Q[LLM: Mistral chat<br/>system forbids made-up links]
-    Q --> R[Sanitize links<br/>keep only allowed URLs]
+    P --> Q[LLM Mistral chat system forbids made up links]
+    Q --> R[Sanitize links keep only allowed URLs]
     R --> S([Answer])
   end
 
-  %% ========== TESTS (required) ==========
-  subgraph TESTS_required
-    K1 --> T[test_index_data_constraints.py<br/>verify ≤12 months & single city]
+  subgraph TESTS required
+    K1 --> T[test_index_data_constraints.py verify last 12 months and single city]
   end
 
-  %% ========== CLEANUP (optional) ==========
-  subgraph CLEANUP_optional
-    K1 --> U{--cleanup-index-out?}
-    U -->|yes + marker| U1[Delete index folder]
+  subgraph CLEANUP optional
+    K1 --> U{--cleanup index out?}
+    U -->|yes and marker| U1[Delete index folder]
     U -->|no| U2[Keep on disk]
   end
 
@@ -291,4 +286,5 @@ rm -f .env
 ## License / usage
 
 This POC is intended for educational/demo purposes. Respect OpenDataSoft/OpenAgenda terms when querying and redistributing data.
+
 
