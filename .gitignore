@@ -1,0 +1,18 @@
+# venv & editors
+.venv/
+.DS_Store
+.idea/
+.vscode/
+
+# secrets
+.env
+
+# caches & compiled
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# generated artifacts
+data/index/
+data/**/*.faiss
+data/**/*.npy

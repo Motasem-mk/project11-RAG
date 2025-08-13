@@ -1,0 +1,12 @@
+langchain>=0.2
+langchain-community>=0.2
+langchain-mistralai>=0.1
+faiss-cpu
+pandas
+numpy
+python-dotenv
+tqdm
+requests
+pytest
+langdetect
+beautifulsoup4>=4.12
